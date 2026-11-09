@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    systemd-tmpfiles --create plakar-pve-provider.conf || true
+    for service in pvedaemon pveproxy pvestatd pvescheduler; do
+        systemctl try-reload-or-restart "$service.service" || true
+    done
+fi
