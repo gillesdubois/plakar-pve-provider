@@ -117,13 +117,17 @@ sub backup_vm {
         $state->{size} += $volume->{size};
     }
 
+    my $firewall_config = $info->{'firewall-config'};
+    utf8::decode($guest_config);
+    utf8::decode($firewall_config) if defined($firewall_config);
+
     my $manifest = {
         version => 2,
         vmid => $vmid + 0,
         archive => $state->{archive},
         'bandwidth-limit' => ($info->{'bandwidth-limit'} // 0) + 0,
         'guest-config' => $guest_config,
-        'firewall-config' => $info->{'firewall-config'},
+        'firewall-config' => $firewall_config,
         devices => $devices,
     };
 
@@ -137,7 +141,6 @@ sub backup_vm {
     log_msg($self, 'info', sprintf("Plakar is reading %d disk(s), %.1f GiB",
         scalar(keys $devices->%*), $state->{size} / 2**30));
 
-    # Blocks while Plakar reads the NBD exports: the snapshot must stay in place.
     my $reply = <$sock>;
     close($sock);
 
@@ -153,7 +156,6 @@ sub backup_vm {
 sub backup_cleanup {
     my ($self, $vmid, $vmtype, $success, $info) = @_;
 
-    # Logical disk size: only Plakar knows the size added to the repository.
     return { stats => { 'archive-size' => $self->{$vmid}->{size} // 0 } } if $success;
     return;
 }

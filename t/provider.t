@@ -93,7 +93,7 @@ my $volumes = {
     my $res = $p->backup_init(100, 'qemu', 1730880000);
     like($res->{'archive-name'}, qr{^[A-Za-z0-9_.+-/:]+$}, 'archive-name is valid');
 
-    eval { $p->backup_vm(100, "cores: 2\ndescription: caf\x{e9}\n", $volumes, { 'firewall-config' => "[OPTIONS]\n" }) };
+    eval { $p->backup_vm(100, "cores: 2\ndescription: caf\xc3\xa9\n", $volumes, { 'firewall-config' => "[OPTIONS]\n" }) };
     is($@, '', 'backup_vm finishes on Plakar ok reply');
     is(finish_plakar($pid, 's100'), 0, 'fake Plakar validated the manifest');
     ok((grep { $_ eq 'info: Plakar is reading 2 disk(s), 3.0 GiB' } @log), 'progress log shows disk count and size');
