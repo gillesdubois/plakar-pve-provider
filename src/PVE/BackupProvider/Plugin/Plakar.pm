@@ -40,9 +40,10 @@ my sub check_device_name {
 my sub session_socket {
     my ($self) = @_;
 
-    my $session = $ENV{PLAKAR_SESSION}
+    my $raw = $ENV{PLAKAR_SESSION}
         // die "PLAKAR_SESSION missing - the backup must be started by Plakar\n";
-    die "invalid PLAKAR_SESSION '$session'\n" if $session !~ m/^[A-Za-z0-9_-]+$/;
+    my ($session) = $raw =~ m/^([A-Za-z0-9_-]+)$/
+        or die "invalid PLAKAR_SESSION '$raw'\n";
 
     return $self->{'storage-plugin'}->socket_dir($self->{scfg}) . "/$session.sock";
 }
@@ -132,7 +133,7 @@ sub backup_vm {
     };
 
     my $path = session_socket($self);
-    local $SIG{PIPE} = 'IGNORE'; # a closed socket must give an error, not kill vzdump
+    local $SIG{PIPE} = 'IGNORE';
     my $sock = IO::Socket::UNIX->new(Type => SOCK_STREAM, Peer => $path)
         or die "cannot connect to Plakar on '$path' - $!\n";
 
