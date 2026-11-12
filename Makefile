@@ -14,6 +14,9 @@ deb: clean
 	install -D -m 0644 src/PVE/BackupProvider/Plugin/Plakar.pm $(PERL5)/PVE/BackupProvider/Plugin/Plakar.pm
 	install -D -m 0644 debian/tmpfiles.conf $(BUILD)/usr/lib/tmpfiles.d/$(PACKAGE).conf
 	install -D -m 0644 LICENSE $(BUILD)/usr/share/doc/$(PACKAGE)/copyright
+	install -d $(BUILD)/usr/share/$(PACKAGE)
+	sed -n 's/^our $$PROTOCOL = \([0-9]*\);$$/\1/p' src/PVE/BackupProvider/Plugin/Plakar.pm > $(BUILD)/usr/share/$(PACKAGE)/protocol
+	test -s $(BUILD)/usr/share/$(PACKAGE)/protocol && chmod 0644 $(BUILD)/usr/share/$(PACKAGE)/protocol
 	install -D -m 0755 debian/postinst $(BUILD)/DEBIAN/postinst
 	sed 's/@VERSION@/$(VERSION)/' debian/control > $(BUILD)/DEBIAN/control
 	dpkg-deb --root-owner-group --build $(BUILD) $(DEB)

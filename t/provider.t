@@ -5,7 +5,7 @@
 use strict;
 use warnings;
 
-use File::Path qw(make_path);
+use File::Path qw(make_path remove_tree);
 use File::Temp qw(tempdir);
 use IO::Socket::UNIX;
 use JSON::PP ();
@@ -212,6 +212,12 @@ my $volumes = {
     $p->restore_vm_cleanup($vol);
     ok(!-e $s, 'restore: session removed');
     ok(-e $image, 'restore: the image is left to Plakar');
+
+    make_path($s);
+    touch("$s/manifest.json", '{"version":1,"devices":{"drive-scsi0":{"size":4}}}');
+    eval { $p->restore_vm_init($vol) };
+    like($@, qr/protocol 1, this provider speaks 2/, 'restore: other protocol version rejected');
+    remove_tree($s);
 
     eval { $p->restore_vm_init($vol) };
     like($@, qr/plakar restore/, 'restore without a Plakar-prepared session rejected');

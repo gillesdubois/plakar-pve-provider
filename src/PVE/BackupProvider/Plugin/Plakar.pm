@@ -14,6 +14,8 @@ use PVE::Tools qw(file_get_contents);
 
 use base qw(PVE::BackupProvider::Plugin::Base);
 
+our $PROTOCOL = 2;
+
 my sub log_msg {
     my ($self, $level, $message) = @_;
     $self->{'log-function'}->($level, $message);
@@ -119,7 +121,7 @@ sub backup_vm {
     utf8::decode($firewall_config) if defined($firewall_config);
 
     my $manifest = {
-        version => 2,
+        version => $PROTOCOL,
         vmid => $vmid + 0,
         archive => $state->{archive},
         'bandwidth-limit' => ($info->{'bandwidth-limit'} // 0) + 0,
@@ -192,6 +194,10 @@ my sub read_manifest {
     my $manifest = eval { from_json(file_get_contents($file, 1024 * 1024)) };
     die "invalid restore manifest '$file'\n"
         if ref($manifest->{devices}) ne 'HASH' || !$manifest->{devices}->%*;
+    my $version = $manifest->{version} // 'none';
+    die "restore manifest uses protocol $version, this provider speaks $PROTOCOL -"
+        . " install matching plakar-pve-provider and Plakar Proxmox integration\n"
+        if $version ne $PROTOCOL;
     return $manifest;
 }
 

@@ -61,6 +61,13 @@ Plakar to provider:
 `bandwidth-limit` is in bytes per second (0 means no limit). Plakar should discard
 (NBD trim) the ranges it has read so the fleecing image does not grow.
 
+## Protocol version
+
+The `version` field of both manifests is the protocol version (`$PROTOCOL` in `Plakar.pm`). It
+changes only when the contract with Plakar changes. The package installs it in
+`/usr/share/plakar-pve-provider/protocol`, which Plakar reads before each QEMU backup or restore
+and refuses to go on when it differs.
+
 ## How a restore runs
 
 Plakar prepares a session under `/run/plakar/<storeid>/restore/<vmid>-qemu-<time>/` with
