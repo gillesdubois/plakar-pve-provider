@@ -4,7 +4,7 @@ Architecture: all
 Section: perl
 Priority: optional
 Maintainer: Gilles DUBOIS <gilles.dubois@factorfx.com>
-Depends: libpve-storage-perl, libjson-perl, pve-qemu-kvm
+Depends: pve-manager (>= 8.4~), libpve-storage-perl, libjson-perl, pve-qemu-kvm
 Description: Plakar backup provider for Proxmox VE
  Storage plugin of type "plakar" that lets vzdump hand each VM disk to
  Plakar as a raw NBD export, so backups deduplicate across runs.
