@@ -10,12 +10,9 @@ use IO::Socket::UNIX;
 use JSON qw(from_json to_json);
 use Socket qw(SOCK_STREAM);
 
-use PVE::Tools qw(file_get_contents run_command);
+use PVE::Tools qw(file_get_contents);
 
 use base qw(PVE::BackupProvider::Plugin::Base);
-
-our $QEMU_NBD = '/usr/bin/qemu-nbd'; 
-our $SYS_BLOCK = '/sys/block';
 
 my sub log_msg {
     my ($self, $level, $message) = @_;
@@ -198,12 +195,6 @@ my sub read_manifest {
     return $manifest;
 }
 
-my sub nbd_disconnect {
-    my ($self, $dev) = @_;
-    eval { run_command([$QEMU_NBD, '--disconnect', $dev], outfunc => sub { }) };
-    log_msg($self, 'warn', "cannot disconnect $dev - $@") if $@;
-}
-
 sub restore_get_mechanism {
     my ($self, $volname) = @_;
 
@@ -240,50 +231,19 @@ sub archive_get_firewall_config {
 sub restore_vm_volume_init {
     my ($self, $volname, $device_name, $info) = @_;
 
-    my $session = restore_session($self, $volname);
-    check_device_name($device_name);
-    my $socket = "$session/$device_name.sock";
-    die "$device_name: Plakar is not serving '$socket'\n" if !-S $socket;
+    my $devices = read_manifest(restore_session($self, $volname))->{devices};
+    my $image = $devices->{ check_device_name($device_name) }->{image} // '';
+    die "$device_name: invalid image '$image'\n"
+        if $image !~ m!^/[^\0\n]*/plakar-\d+-\Q$device_name\E\.raw\z! || !-f $image;
 
-    run_command(['modprobe', 'nbd']) if !-e "$SYS_BLOCK/nbd0";
-
-    my $uri = "nbd+unix:///$device_name?socket=$socket";
-    my $last_err = 'no nbd device';
-    for my $sys (sort { ($a =~ /(\d+)$/)[0] <=> ($b =~ /(\d+)$/)[0] } glob("$SYS_BLOCK/nbd*")) {
-        next if -e "$sys/pid";
-        my ($nbd) = $sys =~ m!/(nbd\d+)$! or next;
-        my $dev = "/dev/$nbd";
-        eval {
-            run_command(
-                [$QEMU_NBD, '--connect', $dev, '--read-only', '--format', 'raw', $uri],
-                outfunc => sub { },
-            );
-        };
-        if ($last_err = $@) {
-            chomp $last_err;
-            next;
-        }
-        $self->{restore}->{$volname}->{$device_name} = $dev;
-        log_msg($self, 'info', "$device_name: reading from Plakar via $dev");
-        return { 'qemu-img-path' => $dev };
-    }
-
-    die "$device_name: cannot attach Plakar export to a /dev/nbdX - $last_err\n";
+    log_msg($self, 'info', "$device_name: reading $image");
+    return { 'qemu-img-path' => $image };
 }
 
-sub restore_vm_volume_cleanup {
-    my ($self, $volname, $device_name, $info) = @_;
-
-    my $dev = delete $self->{restore}->{$volname}->{$device_name};
-    nbd_disconnect($self, $dev) if $dev;
-    return;
-}
+sub restore_vm_volume_cleanup { return }
 
 sub restore_vm_cleanup {
     my ($self, $volname) = @_;
-
-    my $devs = delete($self->{restore}->{$volname}) // {};
-    nbd_disconnect($self, $_) for values $devs->%*;
 
     my $session = eval { restore_session($self, $volname) };
     remove_tree($session) if $session;

@@ -64,9 +64,10 @@ Plakar to provider:
 ## How a restore runs
 
 Plakar prepares a session under `/run/plakar/<storeid>/restore/<vmid>-qemu-<time>/` with
-`manifest.json`, `guest.conf`, an optional `firewall.conf` and one NBD socket per disk
-(`<device>.sock`), then calls `qmrestore <storeid>:<vmid>/qemu-<time> <vmid>`. The provider
-attaches each socket to a free `/dev/nbdX` with `qemu-nbd` and lets `qmrestore` copy it.
+`manifest.json`, `guest.conf` and an optional `firewall.conf`, uploads each disk as a sparse raw
+image whose path is in `manifest.json` (`devices.<device>.image`), then calls
+`qmrestore <storeid>:<vmid>/qemu-<time> <vmid>`. The provider hands each image path to `qmrestore`,
+which copies it with `qemu-img` and skips the holes.
 
 ## Development
 

@@ -182,48 +182,36 @@ my $volumes = {
 
 # --- restore --------------------------------------------------------------------
 {
-    # Fake sysfs: nbd0 already busy; fake qemu-nbd that logs and rejects nbd1 if 'busy1'.
-    my $sys = "$tmp/sys";
-    make_path("$sys/nbd$_") for 0 .. 2;
-    touch("$sys/nbd0/pid", 1);
-    my $nbdlog = "$tmp/qemu-nbd.log";
-    touch("$tmp/qemu-nbd", "#!/bin/sh\ncase \"\$*\" in *connect\\ /dev/nbd1*) [ -e $tmp/busy1 ] && exit 1;; esac\n"
-        . "echo \"\$*\" >> $nbdlog\n");
-    chmod(0755, "$tmp/qemu-nbd");
-    local $PVE::BackupProvider::Plugin::Plakar::QEMU_NBD = "$tmp/qemu-nbd";
-    local $PVE::BackupProvider::Plugin::Plakar::SYS_BLOCK = $sys;
-
     my $p = $class->new_backup_provider({}, 'plk', $log);
     my $vol = '100/qemu-1730880000';
     my $s = "$tmp/plk/restore/100-qemu-1730880000";
+    my $image = "$tmp/plakar-1730880000123-drive-scsi0.raw";
 
     # What Plakar prepares before calling qmrestore
     make_path($s, { mode => 0700 });
-    touch("$s/manifest.json", '{"version":1,"devices":{"drive-scsi0":{"size":1073741824}}}');
+    touch($image, "disk");
+    touch("$s/manifest.json", qq({"version":2,"devices":{"drive-scsi0":{"size":1073741824,"image":"$image"},)
+        . qq("drive-scsi1":{"size":4},"drive-scsi2":{"size":4,"image":"/etc/passwd"}}}));
     touch("$s/guest.conf", "cores: 2\nscsi0: local-lvm:vm-100-disk-0,size=1G\n");
-    my $srv = IO::Socket::UNIX->new(Type => SOCK_STREAM(), Local => "$s/drive-scsi0.sock", Listen => 1)
-        or die "socket: $!";
 
     is_deeply([$p->restore_get_mechanism($vol)], ['qemu-img', 'qemu'], 'restore: qemu-img mechanism');
-    is_deeply($p->restore_vm_init($vol), { 'drive-scsi0' => { size => 1 << 30 } }, 'restore: sizes');
+    is($p->restore_vm_init($vol)->{'drive-scsi0'}->{size}, 1 << 30, 'restore: sizes');
     like($p->archive_get_guest_config($vol), qr/^cores: 2/, 'restore: guest.conf');
     ok(!defined($p->archive_get_firewall_config($vol)), 'restore: no firewall');
 
-    is_deeply($p->restore_vm_volume_init($vol, 'drive-scsi0', {}), { 'qemu-img-path' => '/dev/nbd1' },
-        'restore: nbd0 busy -> nbd1');
+    is_deeply($p->restore_vm_volume_init($vol, 'drive-scsi0', {}), { 'qemu-img-path' => $image },
+        'restore: qemu-img reads the uploaded image');
+    eval { $p->restore_vm_volume_init($vol, 'drive-scsi1', {}) };
+    like($@, qr/invalid image/, 'restore: manifest without image rejected');
+    eval { $p->restore_vm_volume_init($vol, 'drive-scsi2', {}) };
+    like($@, qr/invalid image/, 'restore: image outside a Plakar upload rejected');
+    eval { $p->restore_vm_volume_init($vol, 'drive-scsi9', {}) };
+    like($@, qr/invalid image/, 'restore: unknown device rejected');
+
     $p->restore_vm_volume_cleanup($vol, 'drive-scsi0', {});
-
-    touch("$tmp/busy1");
-    is($p->restore_vm_volume_init($vol, 'drive-scsi0', {})->{'qemu-img-path'}, '/dev/nbd2',
-        'restore: nbd1 taken meanwhile -> nbd2');
-    $p->restore_vm_cleanup($vol); # must disconnect nbd2 without restore_vm_volume_cleanup
-
-    my $uri = "nbd+unix:///drive-scsi0?socket=$s/drive-scsi0.sock";
-    is(do { open(my $fh, '<', $nbdlog) or die; local $/; <$fh> },
-        "--connect /dev/nbd1 --read-only --format raw $uri\n--disconnect /dev/nbd1\n"
-        . "--connect /dev/nbd2 --read-only --format raw $uri\n--disconnect /dev/nbd2\n",
-        'restore: qemu-nbd calls');
+    $p->restore_vm_cleanup($vol);
     ok(!-e $s, 'restore: session removed');
+    ok(-e $image, 'restore: the image is left to Plakar');
 
     eval { $p->restore_vm_init($vol) };
     like($@, qr/plakar restore/, 'restore without a Plakar-prepared session rejected');
