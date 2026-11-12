@@ -81,7 +81,7 @@ sub backup_init {
     my ($self, $vmid, $vmtype, $start_time) = @_;
 
     my $archive = "${vmid}/${vmtype}-${start_time}";
-    $self->{$vmid} = { archive => $archive, size => 0 };
+    $self->{backup}->{$vmid} = { archive => $archive, size => 0 };
 
     return { 'archive-name' => $archive };
 }
@@ -101,7 +101,7 @@ sub backup_vm_query_incremental {
 sub backup_vm {
     my ($self, $vmid, $guest_config, $volumes, $info) = @_;
 
-    my $state = $self->{$vmid} or die "backup_vm called without backup_init for $vmid\n";
+    my $state = $self->{backup}->{$vmid} or die "backup_vm called without backup_init for $vmid\n";
 
     my $devices = {};
     for my $device (sort keys $volumes->%*) {
@@ -113,7 +113,6 @@ sub backup_vm {
         $devices->{$device} = {
             size => $volume->{size} + 0,
             'nbd-path' => $volume->{'nbd-path'},
-            export => $device,
         };
         $state->{size} += $volume->{size};
     }
@@ -157,8 +156,8 @@ sub backup_vm {
 sub backup_cleanup {
     my ($self, $vmid, $vmtype, $success, $info) = @_;
 
-    return { stats => { 'archive-size' => $self->{$vmid}->{size} // 0 } } if $success;
-    return;
+    my $state = delete $self->{backup}->{$vmid} // {};
+    return $success ? { stats => { 'archive-size' => $state->{size} // 0 } } : undef;
 }
 
 sub backup_handle_log_file {
