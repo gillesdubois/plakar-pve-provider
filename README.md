@@ -38,12 +38,6 @@ For internals (backup flow, protocol, development), see [TECHNICAL.md](TECHNICAL
        content backup
    ```
 
-### Options
-
-| Option | Default | Description |
-|---|---|---|
-| `plakar-session-root` | `/run/plakar` | Directory holding the sockets Plakar uses to talk to the provider. |
-
 ## Usage
 
 Backups and restores are started from Plakar, not from Proxmox. Once the storage exists, point
