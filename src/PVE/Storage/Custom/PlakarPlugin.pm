@@ -33,20 +33,14 @@ sub plugindata {
     };
 }
 
+our $SESSION_ROOT = '/run/plakar';
+
 sub properties {
-    return {
-        'plakar-session-root' => {
-            description => "Directory (tmpfs) holding the rendezvous sockets and sessions shared with Plakar.",
-            type => 'string',
-            format => 'pve-storage-path',
-            default => '/run/plakar',
-        },
-    };
+    return {};
 }
 
 sub options {
     return {
-        'plakar-session-root' => { optional => 1 },
         content => { optional => 1 },
         disable => { optional => 1 },
         nodes => { optional => 1 },
@@ -55,7 +49,7 @@ sub options {
 
 sub socket_dir {
     my ($class, $scfg) = @_;
-    return $scfg->{'plakar-session-root'} // properties()->{'plakar-session-root'}->{default};
+    return $SESSION_ROOT;
 }
 
 sub session_root {
