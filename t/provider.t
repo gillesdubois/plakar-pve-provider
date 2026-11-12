@@ -25,11 +25,12 @@ for my $case ([16, 16], [11, 11], [10, 16], [18, 16]) {
 $PVE::Storage::APIVER = 16;
 
 my $tmp = tempdir(CLEANUP => 1);
+$PVE::Storage::Custom::PlakarPlugin::SESSION_ROOT = $tmp;
 my @log;
 my $log = sub { push @log, "$_[0]: $_[1]" };
 
 sub new_provider {
-    return $class->new_backup_provider({ 'plakar-session-root' => $tmp }, 'plk', $log);
+    return $class->new_backup_provider({}, 'plk', $log);
 }
 
 # Simulates Plakar: listens on the session socket, reads the manifest, sends back the reply
@@ -84,7 +85,7 @@ my $volumes = {
         die "firewall-config\n" if $m->{'firewall-config'} ne "[OPTIONS]\n";
         die "devices\n" if join(',', sort keys $m->{devices}->%*) ne 'drive-scsi0,drive-scsi1';
         die "nbd-path\n" if $m->{devices}->{'drive-scsi0'}->{'nbd-path'} ne $volumes->{'drive-scsi0'}->{'nbd-path'};
-        die "export\n" if $m->{devices}->{'drive-scsi1'}->{export} ne 'drive-scsi1';
+        die "export\n" if exists $m->{devices}->{'drive-scsi1'}->{export};
         return '{"status":"ok"}';
     });
 
@@ -192,7 +193,7 @@ my $volumes = {
     local $PVE::BackupProvider::Plugin::Plakar::QEMU_NBD = "$tmp/qemu-nbd";
     local $PVE::BackupProvider::Plugin::Plakar::SYS_BLOCK = $sys;
 
-    my $p = $class->new_backup_provider({ 'plakar-session-root' => $tmp }, 'plk', $log);
+    my $p = $class->new_backup_provider({}, 'plk', $log);
     my $vol = '100/qemu-1730880000';
     my $s = "$tmp/plk/restore/100-qemu-1730880000";
 

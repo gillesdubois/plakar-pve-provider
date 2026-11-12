@@ -45,8 +45,7 @@ Provider to Plakar:
   "devices": {
     "drive-scsi0": {
       "size": 34359738368,
-      "nbd-path": "/run/qemu-server/100.backup-access.<id>/socket",
-      "export": "drive-scsi0"
+      "nbd-path": "/run/qemu-server/100.backup-access.<id>/socket"
     }
   }
 }
