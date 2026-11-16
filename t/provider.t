@@ -80,13 +80,16 @@ my $volumes = {
 
     my $pid = fake_plakar('s100', sub {
         my ($m) = @_;
-        die "vmid\n" if $m->{vmid} != 100 || $m->{version} != 2;
+        die "vmid\n" if $m->{vmid} != 100 || $m->{version} != 1;
         die "guest-config\n" if $m->{'guest-config'} ne "cores: 2\ndescription: caf\x{e9}\n";
         die "firewall-config\n" if $m->{'firewall-config'} ne "[OPTIONS]\n";
         die "devices\n" if join(',', sort keys $m->{devices}->%*) ne 'drive-scsi0,drive-scsi1';
         die "nbd-path\n" if $m->{devices}->{'drive-scsi0'}->{'nbd-path'} ne $volumes->{'drive-scsi0'}->{'nbd-path'};
         die "export\n" if exists $m->{devices}->{'drive-scsi1'}->{export};
-        return '{"status":"ok"}';
+        return join("\n",
+            '{"progress":{"device":"drive-scsi0","read":214748365,"total":1073741824}}',
+            '{"progress":{"device":"bad name","read":1,"total":2}}',
+            '{"status":"ok"}');
     });
 
     eval { $p->job_init(1730880000) };
@@ -98,6 +101,8 @@ my $volumes = {
     is($@, '', 'backup_vm finishes on Plakar ok reply');
     is(finish_plakar($pid, 's100'), 0, 'fake Plakar validated the manifest');
     ok((grep { $_ eq 'info: Plakar is reading 2 disk(s), 3.0 GiB' } @log), 'progress log shows disk count and size');
+    ok((grep { $_ eq 'info: Plakar: drive-scsi0 20% (0.2 / 1.0 GiB)' } @log), 'progress line logged');
+    ok(!(grep { /bad name/ } @log), 'invalid progress line ignored');
 
     my $stats = $p->backup_cleanup(100, 'qemu', 1, {});
     is($stats->{stats}->{'archive-size'}, 3 << 30, 'archive-size = logical size');
@@ -190,7 +195,7 @@ my $volumes = {
     # What Plakar prepares before calling qmrestore
     make_path($s, { mode => 0700 });
     touch($image, "disk");
-    touch("$s/manifest.json", qq({"version":2,"devices":{"drive-scsi0":{"size":1073741824,"image":"$image"},)
+    touch("$s/manifest.json", qq({"version":1,"devices":{"drive-scsi0":{"size":1073741824,"image":"$image"},)
         . qq("drive-scsi1":{"size":4},"drive-scsi2":{"size":4,"image":"/etc/passwd"}}}));
     touch("$s/guest.conf", "cores: 2\nscsi0: local-lvm:vm-100-disk-0,size=1G\n");
 
@@ -214,9 +219,9 @@ my $volumes = {
     ok(-e $image, 'restore: the image is left to Plakar');
 
     make_path($s);
-    touch("$s/manifest.json", '{"version":1,"devices":{"drive-scsi0":{"size":4}}}');
+    touch("$s/manifest.json", '{"version":2,"devices":{"drive-scsi0":{"size":4}}}');
     eval { $p->restore_vm_init($vol) };
-    like($@, qr/protocol 1, this provider speaks 2/, 'restore: other protocol version rejected');
+    like($@, qr/protocol 2, this provider speaks 1/, 'restore: other protocol version rejected');
     remove_tree($s);
 
     eval { $p->restore_vm_init($vol) };

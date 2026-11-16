@@ -30,13 +30,13 @@ When `vzdump` targets the storage, QEMU exposes each VM disk as a consistent NBD
 
 ### Protocol
 
-One JSON line in each direction over the session socket.
+JSON lines over the session socket.
 
 Provider to Plakar:
 
 ```json
 {
-  "version": 2,
+  "version": 1,
   "vmid": 100,
   "archive": "100/qemu-1730880000",
   "bandwidth-limit": 0,
@@ -51,7 +51,14 @@ Provider to Plakar:
 }
 ```
 
-Plakar to provider:
+Plakar to provider, while it reads, one progress line every 5% of each disk, logged in the
+vzdump task:
+
+```json
+{"progress": {"device": "drive-scsi0", "read": 2147483648, "total": 34359738368}}
+```
+
+then the final reply:
 
 ```json
 {"status": "ok"}

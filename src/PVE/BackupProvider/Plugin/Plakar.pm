@@ -14,7 +14,7 @@ use PVE::Tools qw(file_get_contents);
 
 use base qw(PVE::BackupProvider::Plugin::Base);
 
-our $PROTOCOL = 2;
+our $PROTOCOL = 1;
 
 my sub log_msg {
     my ($self, $level, $message) = @_;
@@ -140,12 +140,23 @@ sub backup_vm {
     log_msg($self, 'info', sprintf("Plakar is reading %d disk(s), %.1f GiB",
         scalar(keys $devices->%*), $state->{size} / 2**30));
 
-    my $reply = <$sock>;
+    my $res;
+    while (my $line = <$sock>) {
+        my $msg = eval { from_json($line, { utf8 => 1 }) };
+        die "unreadable reply from Plakar: " . substr($line, 0, 200) . "\n" if ref($msg) ne 'HASH';
+        if (!exists($msg->{progress})) {
+            $res = $msg;
+            last;
+        }
+        my $p = $msg->{progress};
+        next if ref($p) ne 'HASH' || ($p->{device} // '') !~ m/^[A-Za-z0-9_.-]+$/
+            || ($p->{read} // '') !~ m/^\d+$/ || ($p->{total} // '') !~ m/^[1-9]\d*$/;
+        log_msg($self, 'info', sprintf("Plakar: %s %d%% (%.1f / %.1f GiB)", $p->{device},
+            100 * $p->{read} / $p->{total}, $p->{read} / 2**30, $p->{total} / 2**30));
+    }
     close($sock);
 
-    die "Plakar closed the connection without replying\n" if !defined($reply);
-    my $res = eval { from_json($reply, { utf8 => 1 }) };
-    die "unreadable reply from Plakar: " . substr($reply, 0, 200) . "\n" if ref($res) ne 'HASH';
+    die "Plakar closed the connection without replying\n" if !defined($res);
     die "Plakar: " . ($res->{message} // 'unknown error') . "\n" if ($res->{status} // '') ne 'ok';
 
     log_msg($self, 'info', "Plakar has read all disks");
