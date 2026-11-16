@@ -44,7 +44,7 @@ my sub session_socket {
     my ($session) = $raw =~ m/^([A-Za-z0-9_-]+)$/
         or die "invalid PLAKAR_SESSION '$raw'\n";
 
-    return $self->{'storage-plugin'}->socket_dir($self->{scfg}) . "/$session.sock";
+    return "$PVE::Storage::Custom::PlakarPlugin::SESSION_ROOT/$session.sock";
 }
 
 sub new {
@@ -190,8 +190,7 @@ my sub restore_session {
 
     my (undef, $name, undef) = $self->{'storage-plugin'}->parse_volname($volname);
     $name =~ tr!/!-!;
-    my $root = $self->{'storage-plugin'}->session_root($self->{scfg}, $self->{storeid});
-    my $session = "$root/restore/$name";
+    my $session = "$PVE::Storage::Custom::PlakarPlugin::SESSION_ROOT/$self->{storeid}/restore/$name";
     die "no restore session '$session' - restores are started with"
         . " 'plakar restore', which prepares the session then calls qmrestore\n"
         if !-e "$session/manifest.json";

@@ -47,16 +47,6 @@ sub options {
     };
 }
 
-sub socket_dir {
-    my ($class, $scfg) = @_;
-    return $SESSION_ROOT;
-}
-
-sub session_root {
-    my ($class, $scfg, $storeid) = @_;
-    return $class->socket_dir($scfg) . "/$storeid";
-}
-
 sub new_backup_provider {
     my ($class, $scfg, $storeid, $log_function) = @_;
 

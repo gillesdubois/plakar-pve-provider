@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Test outside PVE: stubs in t/lib, real PVE/BackupProvider/Plugin/Base.pm.
+# Test outside PVE: PVE modules stubbed in t/lib.
 # A child process plays Plakar on the session socket.
 #   prove -I t/lib -I src t/provider.t
 use strict;
